@@ -3,7 +3,8 @@
 The `TV debug APK` GitHub Actions workflow runs on pushes to non-`master`
 branches. It runs the `common` unit tests, lints the beta app, builds a beta
 debug APK, and uploads the universal APK as `SmartTube-TV-debug`. This keeps
-the Android build toolchain on the GitHub runner.
+the Android build toolchain on the GitHub runner. The runner uses Java 11 for
+the repository's Robolectric 4.6.1 tests.
 
 1. Download the APK from the workflow run's **Artifacts** section.
 2. On the Android TV or Google TV device, enable developer options and network
