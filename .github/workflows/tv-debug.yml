@@ -28,7 +28,7 @@ jobs:
       - name: Test and build
         run: |
           chmod +x gradlew
-          ./gradlew :common:testStbetaDebugUnitTest :smarttubetv:lintStbetaDebug :smarttubetv:assembleStbetaDebug
+          ./gradlew :common:testStbetaDebugUnitTest :smarttubetv:lintStbetaRelease :smarttubetv:assembleStbetaDebug
 
       - name: Upload universal APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
