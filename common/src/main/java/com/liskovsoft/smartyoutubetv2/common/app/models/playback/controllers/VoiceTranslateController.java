@@ -1,5 +1,7 @@
 package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 
+import android.os.SystemClock;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.R;
@@ -10,6 +12,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.smartyoutubetv2.common.vot.TranslationAudioPlayer;
+import com.liskovsoft.smartyoutubetv2.common.vot.VotAudioSource;
 import com.liskovsoft.smartyoutubetv2.common.vot.VotClient;
 
 import io.reactivex.Single;
@@ -20,14 +23,21 @@ import io.reactivex.schedulers.Schedulers;
 /** Manual English-to-Russian voice-over; keeps the main player as the playback clock. */
 public final class VoiceTranslateController extends BasePlayerController {
     private static final String TAG = VoiceTranslateController.class.getSimpleName();
-    private static final float ORIGINAL_VOLUME = 0.25f;
+    private static final float ORIGINAL_VOLUME = 0.15f;
     private TranslationAudioPlayer mAudio;
     private Disposable mRequest;
     private boolean mEnabled;
     private boolean mDucked;
     private float mPreviousVolume;
     private float mPreferenceAtDuck;
+    private float mCurrentVolume;
+    private long mSpeechUntil;
     private int mGeneration;
+    private VotAudioSource mSource;
+
+    public void onFormatInfo(MediaItemFormatInfo info) {
+        mSource = VotAudioSource.best(info);
+    }
 
     private final Runnable mSync = new Runnable() {
         @Override
@@ -36,6 +46,14 @@ public final class VoiceTranslateController extends BasePlayerController {
                 sync();
                 Utils.postDelayed(this, 1000);
             }
+        }
+    };
+
+    private final Runnable mVolumeTick = new Runnable() {
+        @Override public void run() {
+            if (!mDucked || mAudio == null || getPlayer() == null) return;
+            updateVolume();
+            Utils.postDelayed(this, 50);
         }
     };
 
@@ -59,7 +77,8 @@ public final class VoiceTranslateController extends BasePlayerController {
         int generation = ++mGeneration;
         String videoId = video.videoId;
         long durationMs = player.getDurationMs();
-        mRequest = Single.fromCallable(() -> new VotClient().translate(videoId, durationMs))
+        VotAudioSource source = mSource;
+        mRequest = Single.fromCallable(() -> new VotClient().translate(videoId, durationMs, source))
                 .subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(url -> {
                     if (mEnabled && generation == mGeneration && getPlayer() != null) play(url);
@@ -83,7 +102,9 @@ public final class VoiceTranslateController extends BasePlayerController {
                 mPreviousVolume = getPlayer().getVolume();
                 mPreferenceAtDuck = getPlayerData().getPlayerVolume();
                 mDucked = true;
-                applyDuck();
+                mCurrentVolume = mPreviousVolume;
+                mSpeechUntil = 0;
+                Utils.postDelayed(mVolumeTick, 50);
                 sync();
                 Utils.postDelayed(mSync, 1000);
                 MessageHelpers.showMessage(getContext(), R.string.vot_playing);
@@ -104,8 +125,25 @@ public final class VoiceTranslateController extends BasePlayerController {
                 mPreviousVolume = preferredVolume();
                 mPreferenceAtDuck = getPlayerData().getPlayerVolume();
             }
-            getPlayer().setVolume(mPreviousVolume * ORIGINAL_VOLUME);
+            updateVolume();
         }
+    }
+
+    private void updateVolume() {
+        if (!mDucked || mAudio == null || getPlayer() == null) return;
+        if (getPlayerData().getPlayerVolume() != mPreferenceAtDuck) {
+            mPreviousVolume = preferredVolume();
+            mPreferenceAtDuck = getPlayerData().getPlayerVolume();
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (mAudio.isReady() && getPlayer().isPlaying() && mAudio.getSpeechRms() >= 0.012) {
+            mSpeechUntil = now + 520;
+        }
+        float target = now < mSpeechUntil ? Math.min(mPreviousVolume, ORIGINAL_VOLUME) : mPreviousVolume;
+        float step = target < mCurrentVolume ? 0.45f : 0.083f;
+        mCurrentVolume += (target - mCurrentVolume) * step;
+        if (Math.abs(target - mCurrentVolume) < 0.002f) mCurrentVolume = target;
+        getPlayer().setVolume(mCurrentVolume);
     }
 
     private float preferredVolume() {
@@ -132,6 +170,7 @@ public final class VoiceTranslateController extends BasePlayerController {
         mEnabled = false;
         ++mGeneration;
         Utils.removeCallbacks(mSync);
+        Utils.removeCallbacks(mVolumeTick);
         if (mRequest != null) { mRequest.dispose(); mRequest = null; }
         if (mAudio != null) { mAudio.release(); mAudio = null; }
         if (mDucked && getPlayer() != null) {
@@ -139,6 +178,7 @@ public final class VoiceTranslateController extends BasePlayerController {
                     ? mPreviousVolume : preferredVolume());
         }
         mDucked = false;
+        mSpeechUntil = 0;
         setButton(PlayerUI.BUTTON_OFF);
     }
 
@@ -146,7 +186,7 @@ public final class VoiceTranslateController extends BasePlayerController {
         if (getPlayer() != null) getPlayer().setButtonState(R.id.action_voice_translate, state);
     }
 
-    @Override public void onNewVideo(Video item) { stop(); }
+    @Override public void onNewVideo(Video item) { stop(); mSource = null; }
     @Override public void onEngineReleased() { stop(); }
     @Override public void onPlayEnd() { stop(); }
     @Override public void onFinish() { stop(); }

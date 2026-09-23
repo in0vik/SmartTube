@@ -21,13 +21,18 @@ the repository's Robolectric 4.6.1 tests.
    `https://www.youtube.com/watch?v=arj7oStGLkU`, then choose **Russian
    voice-over** in the player controls. Check pause/resume, seek, speed change,
    Home/return, and next video. The original volume must recover exactly when
-   voice-over stops. The video must remain playable if translation fails.
+   voice-over stops. Test an uncached English video too: the translation
+   service may request source audio, which the app should upload automatically.
+   The video must remain playable if translation fails.
 
-Voice-over currently uses Yandex Browser's unofficial translation endpoint.
-It requests English-to-Russian audio for on-demand YouTube videos. If the
-service requests a source-audio upload or login, the control reports that
-translation is unavailable and leaves playback untouched. The returned audio
-URL is short-lived and is never stored. Protocol behavior is based on
+Voice-over uses Yandex Browser's unofficial translation endpoint. Pressing the
+button requests English-to-Russian audio with lively voices preferred. If the
+service requests source audio, the app streams the highest-bitrate available
+non-DRC English audio-only format and uploads it in chunks. Lively voices that
+require an account fall back to standard voices. The translated track plays at
+100%; the original track smoothly ducks to at most 15% during speech and
+returns to its prior volume after speech or when voice-over stops. The returned
+audio URL is short-lived and is never stored. Protocol behavior is based on
 [`voice-over-translation`](https://github.com/ilyhalight/voice-over-translation)
 and [vot.js](https://github.com/FOSWLY/vot.js).
 
