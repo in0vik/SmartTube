@@ -1,0 +1,39 @@
+name: TV debug APK
+
+on:
+  push:
+    branches-ignore:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Test and build
+        run: |
+          chmod +x gradlew
+          ./gradlew :common:testStbetaDebugUnitTest :smarttubetv:lintStbetaDebug :smarttubetv:assembleStbetaDebug
+
+      - name: Upload universal APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SmartTube-TV-debug
+          path: smarttubetv/build/outputs/apk/stbeta/debug/*_universal.apk
+          if-no-files-found: error
+          retention-days: 7
