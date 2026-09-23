@@ -317,6 +317,11 @@
     <string name="action_video_info">Описание видео</string>
     <string name="action_screen_off">Выключить экран</string>
     <string name="action_sound_off">Без звука</string>
+    <string name="vot_enable">Русская озвучка</string>
+    <string name="vot_disable">Выключить озвучку</string>
+    <string name="vot_loading">Загружаю русскую озвучку…</string>
+    <string name="vot_playing">Русская озвучка включена</string>
+    <string name="vot_unavailable">Озвучка для этого видео недоступна</string>
     <string name="action_playback_queue">Очередь воспроизведения</string>
     <string name="action_video_speed">Скорость видео</string>
     <string name="action_subtitles">Субтитры</string>

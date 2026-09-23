@@ -17,9 +17,19 @@ the repository's Robolectric 4.6.1 tests.
 4. Run `scrcpy` to view and control the device from the Mac. If audio forwarding
    is unavailable, run `scrcpy --no-audio` and listen on the TV.
 5. During playback, use `adb logcat -v time AndroidRuntime:E '*:S'` to catch
-   crashes. After adding translation, check start, pause/resume, seek, speed
-   change, next video, and network loss. The video must remain playable if
-   translation fails.
+   crashes. To test voice-over, open the English talk
+   `https://www.youtube.com/watch?v=arj7oStGLkU`, then choose **Russian
+   voice-over** in the player controls. Check pause/resume, seek, speed change,
+   Home/return, and next video. The original volume must recover exactly when
+   voice-over stops. The video must remain playable if translation fails.
+
+Voice-over currently uses Yandex Browser's unofficial translation endpoint.
+It requests English-to-Russian audio for on-demand YouTube videos. If the
+service requests a source-audio upload or login, the control reports that
+translation is unavailable and leaves playback untouched. The returned audio
+URL is short-lived and is never stored. Protocol behavior is based on
+[`voice-over-translation`](https://github.com/ilyhalight/voice-over-translation)
+and [vot.js](https://github.com/FOSWLY/vot.js).
 
 The debug APK has a different signing key from official SmartTube builds. If
 `adb install -r` reports a signature mismatch, use a device without the
