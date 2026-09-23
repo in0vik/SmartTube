@@ -25,8 +25,8 @@ public final class VoiceTranslateController extends BasePlayerController {
     private Disposable mRequest;
     private boolean mEnabled;
     private boolean mDucked;
-    private boolean mViewPaused;
     private float mPreviousVolume;
+    private float mPreferenceAtDuck;
     private int mGeneration;
 
     private final Runnable mSync = new Runnable() {
@@ -81,6 +81,7 @@ public final class VoiceTranslateController extends BasePlayerController {
             public void onReady() {
                 if (!mEnabled || getPlayer() == null) return;
                 mPreviousVolume = getPlayer().getVolume();
+                mPreferenceAtDuck = getPlayerData().getPlayerVolume();
                 mDucked = true;
                 applyDuck();
                 sync();
@@ -98,13 +99,31 @@ public final class VoiceTranslateController extends BasePlayerController {
     }
 
     private void applyDuck() {
-        if (mDucked && getPlayer() != null) getPlayer().setVolume(mPreviousVolume * ORIGINAL_VOLUME);
+        if (mDucked && getPlayer() != null) {
+            if (getPlayerData().getPlayerVolume() != mPreferenceAtDuck) {
+                mPreviousVolume = preferredVolume();
+                mPreferenceAtDuck = getPlayerData().getPlayerVolume();
+            }
+            getPlayer().setVolume(mPreviousVolume * ORIGINAL_VOLUME);
+        }
+    }
+
+    private float preferredVolume() {
+        float volume = getPlayerData().getPlayerVolume();
+        Video video = getVideo();
+        if (video != null) {
+            if (getPlayerTweaksData().isPlayerAutoVolumeEnabled()) {
+                volume = volume < 1f ? volume * video.volume : video.volume;
+            }
+            if (video.isShorts) volume /= 2f;
+        }
+        return volume;
     }
 
     private void sync() {
         PlaybackView player = getPlayer();
         if (player == null || mAudio == null || !mAudio.isReady()) return;
-        if (player.isPlaying() && !mViewPaused && !player.isLoading()) mAudio.resume(); else mAudio.pause();
+        if (player.isPlaying()) mAudio.resume(); else mAudio.pause();
         long position = player.getPositionMs();
         if (Math.abs(mAudio.getPositionMs() - position) > 750) mAudio.seekTo(position);
     }
@@ -115,9 +134,11 @@ public final class VoiceTranslateController extends BasePlayerController {
         Utils.removeCallbacks(mSync);
         if (mRequest != null) { mRequest.dispose(); mRequest = null; }
         if (mAudio != null) { mAudio.release(); mAudio = null; }
-        if (mDucked && getPlayer() != null) getPlayer().setVolume(mPreviousVolume);
+        if (mDucked && getPlayer() != null) {
+            getPlayer().setVolume(getPlayerData().getPlayerVolume() == mPreferenceAtDuck
+                    ? mPreviousVolume : preferredVolume());
+        }
         mDucked = false;
-        mViewPaused = false;
         setButton(PlayerUI.BUTTON_OFF);
     }
 
@@ -130,8 +151,7 @@ public final class VoiceTranslateController extends BasePlayerController {
     @Override public void onPlayEnd() { stop(); }
     @Override public void onFinish() { stop(); }
     @Override public void onViewDestroyed() { stop(); }
-    @Override public void onViewPaused() { mViewPaused = true; if (mAudio != null) mAudio.pause(); }
-    @Override public void onViewResumed() { mViewPaused = false; sync(); }
+    @Override public void onViewResumed() { sync(); }
     @Override public void onVideoLoaded(Video item) { applyDuck(); }
     @Override public void onTrackChanged(FormatItem track) { applyDuck(); }
     @Override public void onPlay() { sync(); }
